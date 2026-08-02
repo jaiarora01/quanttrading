@@ -54,12 +54,16 @@ class Settings(BaseSettings):
 
     # --- REAL-MONEY guardrails (enforced by LiveCondorAdvisor, not just docs) ---
     # Small account => defined-risk iron condors ONLY. Never a naked position.
-    live_account: float = Field(default=150_000.0, alias="QT_LIVE_ACCOUNT")
+    live_account: float = Field(default=50_000.0, alias="QT_LIVE_ACCOUNT")
     # Stop-loss on a naked strangle, as a multiple of premium collected (validated: 2x).
     live_stop_mult: float = Field(default=2.0, alias="QT_LIVE_STOP_MULT")
     live_max_risk_pct: float = Field(default=0.12, alias="QT_LIVE_MAX_RISK")   # max loss <=12% of account
     live_max_lots: int = Field(default=1, alias="QT_LIVE_MAX_LOTS")
     live_halt_drawdown: float = Field(default=0.20, alias="QT_LIVE_HALT_DD")   # stop trading at -20%
+    # Wing distance. At a ₹50k account this is load-bearing, not cosmetic: 100 pts
+    # keeps max loss ~11% of account (inside live_max_risk_pct) across VIX 13-28 and
+    # 7-21 DTE. Widening to 150 pts pushes it to ~16% and the advisor REFUSES the
+    # trade. Do not raise this without re-checking the gate at your account size.
     live_wing_points: int = Field(default=100, alias="QT_LIVE_WING_PTS")       # protective wing distance
     # Event-risk veto: skip selling premium into Budget/RBI/election-class events.
     live_event_veto: bool = Field(default=True, alias="QT_EVENT_VETO")

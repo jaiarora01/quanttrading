@@ -1,20 +1,36 @@
 # Live Trading Rules — read this before every trade
 
-**Account: ₹1,50,000 · 1 lot max · manual execution · take profit at 50%**
+**Account: ₹50,000 · 1 lot max · manual execution · take profit at 50%**
 
-> Realistic expectation: **~₹4,800/month (~38%/yr on margin)** *if* it behaves like
-> the backtest. That is not a promise — it's a 5.4-year simulation, and you have
-> barely any live cycles yet.
+> Realistic expectation: **~₹500–1,500/month**. At ₹50k this is tuition, not income
+> — 4-leg costs eat ~20% of gross premium. That is not a promise either; it's an
+> estimate for a structure with **no 5.4-year backtest behind it** (see below).
 
 ## What you're trading and why
 
 The one edge this project found is **selling index option premium** — India VIX
 runs ~26% above realized volatility, and you get paid for that gap.
 
-At ₹1.5L you can margin **the validated strategy**: a short ~1-SD NIFTY strangle
-with a 2× stop, closed at 50% of credit. That's the version with 5.4 years behind
-it (38.4%/yr, Sharpe 1.08). Smaller accounts can't margin it and fall back to a
-defined-risk iron condor — the advisor picks automatically.
+### ⚠️ At ₹50k you are NOT trading the validated strategy
+
+The 5.4-year result (38.4%/yr, Sharpe 1.08) is for a short ~1-SD NIFTY **strangle**,
+which needs ~₹1.5L of margin. **₹50k cannot margin it.** The advisor therefore falls
+back to a defined-risk **iron condor** — automatically, at
+[`advisor.py:109`](options/advisor.py#L109).
+
+That fallback is the *sane* choice at this size (your loss is capped by the wings
+instead of open-ended), but be clear about what it costs you:
+
+| | Strangle (₹1.5L) | Condor (₹50k) |
+|---|---|---|
+| Backtested over 5.4 yrs | ✅ Yes | ❌ **No** |
+| Legs / costs | 2 legs | 4 legs, ~20% of gross premium |
+| Max loss | Open-ended past the stop | Capped by wings (~₹5,300) |
+| Expectation | ~₹4,800/mo | ~₹500–1,500/mo |
+
+The VRP edge it harvests is the same, but the wings sell away much of the premium,
+and **the condor variant's returns are modelled, not validated.** Treat early
+months as calibration, not proof.
 
 ## The rules (non-negotiable)
 
@@ -27,31 +43,42 @@ defined-risk iron condor — the advisor picks automatically.
    lives — don't reach for it.
 5. **Respect the 2× stop.** Don't "wait for it to come back."
 6. **Never widen a loser** or roll to avoid taking a loss. Take the loss.
-7. **Halt at −20% of account (−₹30,000).** Stop trading entirely. Review, don't
-   revenge-trade. The advisor enforces this automatically.
+7. **Halt at −20% of account (−₹10,000).** Stop trading entirely. Review, don't
+   revenge-trade. The advisor enforces this automatically. Note that's only ~2
+   max-loss trades — at ₹50k the halt arrives fast.
 8. **Only sell when VIX ≥ 13.** Cheap premium isn't worth the tail.
 9. **Never sell into a scheduled event.** The advisor auto-vetoes Budget (hard)
    and RBI/election-class events (within 3 days). Keep `config/events.json`
    current — verify RBI MPC dates at rbi.org.in.
 10. **Record every real fill.** That's how we learn what actually happens vs the model.
 
-### ⚠️ A naked strangle's stop is a plan, not a guarantee
+### ⚠️ What the wings do and don't protect
 
-At ₹1.5L the advisor offers the **naked** strangle. Your −₹18,000 stop is 12% of
-the account — survivable. But an overnight gap can blow straight through it: the
-backtest's worst single loss was **−₹37,000 (25% of your account)**, and a real
-crash could be worse. Never leave a naked position unmonitored.
+The condor's wings make your max loss **knowable in advance** (~₹5,300, ~11% of
+account) — that's a real improvement over a naked stop, which an overnight gap can
+blow straight through. This is why the small account gets the safer structure.
 
-**₹1.5L is exactly one lot of margin — you have zero buffer.** Margin requirements
-spike in volatile stretches, precisely when you're losing. **₹1.8–2L would let the
-same trade breathe.**
+But the wings are only 100 points wide, and that width is **load-bearing**:
+
+- At 100 pts, max loss ≈ ₹5,268 → **11% of ₹50k** → advisor says OK
+- At 150 pts, max loss ≈ ₹8,063 → **16% of ₹50k** → advisor **REFUSES**
+
+So do not widen the wings to collect more credit. It will simply stop producing
+tradeable tickets, and if you widen the risk cap instead you've removed the one
+thing making ₹50k survivable.
+
+**The honest sizing note:** ₹50k is below what this strategy really wants. Two
+max-loss trades hit the −20% halt. If you can fund ₹1.5L+ you get the *validated*
+strangle instead of an unvalidated condor; ₹1.8–2L gives that trade margin buffer.
+Trading ₹50k is defensible for learning the mechanics with money you can lose —
+not for generating income.
 
 ## Pre-trade checklist (every single time)
 
 - [ ] Token refreshed today (`python scripts/fyers_auth.py`)
 - [ ] No position currently open
 - [ ] Advisor returned a **ticket**, not a refusal
-- [ ] Max loss shown is **≤ 12% of account** (~₹18,000)
+- [ ] Max loss shown is **≤ 12% of account** (~₹6,000)
 - [ ] I can afford to lose that **entirely, today**, without it affecting my life
 - [ ] I placed **every leg** shown on the ticket
 - [ ] I recorded my **actual** fill (`--record`, or let the daemon auto-detect)
@@ -108,11 +135,12 @@ Until step 1, `--mode auto` refuses to start, by design.
 
 | | Reality |
 |---|---|
-| Win rate | ~78–91% (losses still come) |
+| Win rate | ~78–91% *for the strangle* — the condor is unvalidated |
 | Typical loss | **bigger than a typical win** |
-| Worst backtested | −₹37,000 (25% of your account) |
-| Monthly | ~₹4,800 — *if* it behaves like the backtest |
-| Live validation | **barely started** — one completed paper cycle |
+| Worst case per trade | ~−₹5,300, capped by the wings (~11% of ₹50k) |
+| Monthly | ~₹500–1,500 — modelled, not backtested |
+| Costs | ~20% of gross premium (4 legs) |
+| Live validation | **barely started** — one completed paper cycle, at ₹1.5L basis |
 
 **If you find yourself checking it every 10 minutes, or wanting to add lots after
 a loss — stop trading. That instinct is what empties accounts, not the strategy.**

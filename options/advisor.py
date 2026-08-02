@@ -7,8 +7,14 @@ a human circuit-breaker is a feature, not a limitation.
 Why iron condors and not the backtested strangle: a ₹50k account cannot margin a
 naked NIFTY strangle (~₹1.5L needed), and even a standard 1SD/2SD condor risks
 ₹26k–58k per trade — 50–117% of the account. Wings are therefore **mandatory and
-tight**, and a hard gate refuses any trade risking more than `live_max_risk_pct`
-of the account.
+tight** (100 pts keeps max loss ~11% of ₹50k; 150 pts breaches the gate at ~16%),
+and a hard gate refuses any trade risking more than `live_max_risk_pct` of the
+account.
+
+**The condor is NOT the validated strategy.** The 5.4-year result (38.4%/yr,
+Sharpe 1.08) belongs to the strangle; the condor harvests the same VRP edge but
+sells much of it away to buy the wings, and its returns are modelled, not
+backtested. Above `MARGIN_PER_LOT` this advisor switches to the strangle.
 
 Honest framing: at ₹50k this is tuition, not income. Expect ~₹500–1,500/month,
 with 4-leg costs eating ~20% of gross premium.

@@ -79,11 +79,13 @@ python scripts/live_advisor.py --record         # log your actual fill
 python scripts/live_monitor.py [--watch]        # track the open position
 python scripts/live_monitor.py --close 1850     # record the exit (₹ debit paid)
 ```
-> **Never places an order** — the only broker calls are read-only. At ₹1.5L the
-> advisor offers the **validated naked strangle** (2× stop, take profit at 50%);
-> smaller accounts fall back to defined-risk condors. Hard gates: ≤12% risk/trade,
-> VIX≥13, **event veto** (no selling into Budget/RBI — `config/events.json`),
-> halt at −20%. Read **[LIVE_TRADING.md](LIVE_TRADING.md)** first.
+> **Never places an order** — the only broker calls are read-only. Default account
+> is **₹50,000**, which cannot margin a naked strangle, so the advisor issues
+> **defined-risk iron condors** (max loss ~₹5,300, capped by 100-pt wings). Note the
+> 5.4-year validated result is for the *strangle* — at ₹1.5L+ the advisor offers that
+> instead. Hard gates: ≤12% risk/trade, VIX≥13, **event veto** (no selling into
+> Budget/RBI — `config/events.json`), halt at −20%. Set `QT_LIVE_ACCOUNT` to your
+> real capital. Read **[LIVE_TRADING.md](LIVE_TRADING.md)** first.
 >
 > Event veto also accepts external flags at `state/event_flags.json` (same schema)
 > — a hook for a cron job or LLM news-checker to add vetoes. It can only *remove*

@@ -6,6 +6,7 @@ import pandas as pd
 from config.settings import get_settings
 from options.advisor import LiveCondorAdvisor
 from options.data import NIFTY_LOT
+from options.vol_backtest import MARGIN_PER_LOT
 
 
 class FakeChain:
@@ -69,3 +70,34 @@ def test_a_bigger_account_allows_the_same_trade():
     s = _settings(live_account=500_000, live_wing_points=300, live_max_risk_pct=0.12)
     t = LiveCondorAdvisor(FakeChain(), s).advise()
     assert t.ok, t.reason                        # sizing, not the strategy, was the problem
+
+
+def test_default_account_is_50k_and_yields_a_defined_risk_condor():
+    """The shipped defaults must never put a ₹50k account in a naked position.
+
+    Pins the configured account size AND the structure it implies: below
+    MARGIN_PER_LOT the advisor must choose the 4-leg condor, never the strangle.
+    """
+    s = get_settings()
+    assert s.live_account == 50_000
+    assert s.live_account < MARGIN_PER_LOT       # cannot margin the naked strangle
+    t = LiveCondorAdvisor(FakeChain(), s).advise()
+    assert t.ok, t.reason
+    assert t.structure == "condor"               # defined risk, not naked
+    assert len(t.legs) == 4
+    assert t.max_loss_pct <= s.live_max_risk_pct
+
+
+def test_default_wing_width_keeps_risk_inside_the_gate():
+    """100-pt wings are load-bearing at ₹50k: 150 pts must breach the 12% cap.
+
+    Guards the FINDINGS/LIVE_TRADING claim that widening the wings to collect more
+    credit silently stops producing tradeable tickets.
+    """
+    s = get_settings()
+    assert s.live_wing_points == 100
+    ok = LiveCondorAdvisor(FakeChain(), s).advise()
+    assert ok.ok and ok.max_loss_pct <= 0.12
+
+    wider = LiveCondorAdvisor(FakeChain(), _settings(live_wing_points=150)).advise()
+    assert wider.max_loss > ok.max_loss          # wider wings => strictly more risk
