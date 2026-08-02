@@ -73,7 +73,8 @@ other. Stop with `Ctrl+C`, or `pkill -f run_options_daemon.py` / `pkill -f pnl_w
 ### 3b. 💰 REAL MONEY — advisor / monitor / autonomous daemon
 ```bash
 python scripts/run_live_daemon.py --mode alert  # ⭐ watches all day, macOS-notifies when to act
-python scripts/run_live_daemon.py --mode shadow # decide + log only (silent validation)
+python scripts/run_live_daemon.py --mode shadow # full autonomous dry-run: logs broker-ready orders, places NONE
+python scripts/shadow_report.py                 # readiness evidence (would-be track record + logged orders)
 python scripts/live_advisor.py                  # manual: show the trade to place (or refusal)
 python scripts/live_advisor.py --record         # log your actual fill
 python scripts/live_monitor.py [--watch]        # track the open position

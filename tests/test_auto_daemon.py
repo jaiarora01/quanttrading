@@ -106,11 +106,13 @@ def test_alert_mode_notifies_once_for_the_same_setup(monkeypatch, tmp_path):
 
 
 def test_shadow_mode_decides_but_never_notifies(monkeypatch, tmp_path):
+    for name in ("SHADOW_POS", "SHADOW_ORDERS", "SHADOW_FILLS"):
+        monkeypatch.setattr(f"options.shadow_executor.{name}", tmp_path / f"{name.lower()}.jsonl")
     calls = []
     d = _daemon(monkeypatch, tmp_path, mode="shadow", calls=calls)
     rec = d.cycle()
-    assert rec["decision"] == "enter"               # still decides
-    assert calls == []                              # but stays silent
+    assert rec["decision"] == "shadow-enter"        # decides + simulates the fill
+    assert calls == []                              # but stays silent (no notification)
 
 
 def test_low_vix_produces_no_trade(monkeypatch, tmp_path):

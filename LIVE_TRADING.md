@@ -91,18 +91,32 @@ for whether the automation actually makes the right calls.
 - **It can't predict.** ~78–91% win rate means losses still come, and they're
   bigger than wins. That's the deal you're accepting.
 
-## If you want true auto-execution later
+## The road to full automation (and where you are on it)
 
 Automated order placement has required a **SEBI-registered Algo-ID** since April
 2026. Running an unregistered algo risks regulatory action and broker suspension.
+So full auto is gated behind real steps, in order:
 
-1. **Request algo-trading registration through Fyers**
-2. Set `QT_LIVE_ALGO_ID` in `.env`
-3. Implement `FyersBroker(Broker)` against `execution/interfaces.py`, wire into `auto` mode
-4. **Run `shadow` mode first** — only trust it with orders once the decision log
-   shows it consistently made the right calls
+```
+0. Prove it in SHADOW mode          ← YOU ARE HERE
+1. Register an Algo-ID with Fyers    ← paperwork only you can do; the legal gate
+2. Implement FyersBroker(Broker)     ← wire real orders (payloads already built)
+3. Kill-switches + daily-loss cap
+4. Flip to auto — real money
+```
 
-Until step 1, `--mode auto` refuses to start, by design.
+### Step 0 — shadow mode (running now, zero orders)
+```bash
+python scripts/run_live_daemon.py --mode shadow   # full autonomous dry-run
+python scripts/shadow_report.py                    # the readiness evidence
+```
+Shadow mode runs the **entire** auto loop — enter, manage, take profit at 50%,
+stop, expiry — deciding exactly what auto-mode would, and writing the
+**broker-ready order payloads** to `state/shadow_orders.jsonl`. It places nothing.
+When the win rate holds over ~20 cycles **and** the logged orders look right,
+you've earned the right to consider steps 1–4.
+
+`--mode auto` refuses to start until you have a real Algo-ID (step 1).
 
 ## Honest expectations
 
