@@ -23,6 +23,7 @@ from options.advisor import LiveCondorAdvisor
 from options.data import NIFTY_LOT, OptionsData, parse_expiry
 from options.live_monitor import LiveMonitor
 from options.real_ledger import RealLedger
+from options.shadow_executor import ShadowExecutor
 
 DECISIONS = STATE_DIR / "decisions.jsonl"
 VALID_MODES = ("shadow", "alert", "auto")
@@ -63,19 +64,39 @@ class LiveAutoDaemon:
         self.notifier = notifier
         self.deduper = Deduper(self.s.live_notify_repeat_s)
         self.monitor = LiveMonitor(data, self.ledger, self.s)
+        self.shadow = ShadowExecutor(data, self.s)
         self._last_debit: float | None = None
 
     # --- one decision cycle (unit-testable) --------------------------------
     def cycle(self, now: pd.Timestamp | None = None) -> dict:
         now = now or pd.Timestamp.now(tz="Asia/Kolkata")
-        self._sync_position()
-        if self.ledger.open_position():
-            rec = self._manage_open()
+        if self.mode == "shadow":
+            rec = self._shadow_cycle(now)      # full autonomous dry-run, zero orders
         else:
-            rec = self._look_for_entry()
+            rec = self._alert_cycle(now)       # decide + notify; human places the click
         rec.update({"ts": now.isoformat(timespec="seconds"), "mode": self.mode})
         self._log(rec)
         return rec
+
+    def _alert_cycle(self, now: pd.Timestamp) -> dict:
+        self._sync_position()
+        return self._manage_open() if self.ledger.open_position() else self._look_for_entry()
+
+    def _shadow_cycle(self, now: pd.Timestamp) -> dict:
+        """Simulate exactly what auto-mode would do — enter, manage, exit — while
+        placing nothing. Logs broker-ready order payloads for later use."""
+        pos = self.shadow.current()
+        if pos is None:
+            advisor = LiveCondorAdvisor(self.d, self.s, realized_pnl=self.shadow.stats()["realized"])
+            t = advisor.advise()
+            if not t.ok:
+                return {"decision": "no-trade", "reason": t.reason}
+            return self.shadow.open(t, now)
+        reason, pnl = self.shadow.decide(pos, now)
+        if reason:
+            return self.shadow.close(pos, reason, pnl, now)
+        return {"decision": "hold", "pnl": round(pnl),
+                "dte": (pd.to_datetime(pos["expiry"]).date() - now.date()).days}
 
     # --- read-only position sync -------------------------------------------
     def _sync_position(self) -> None:
